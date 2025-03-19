@@ -3,6 +3,8 @@
 
 #include <cassert>
 #include <bitset>
+#include <cstring>
+#include <iostream>
 
 namespace dev::common{
     /**
@@ -44,7 +46,21 @@ namespace dev::common{
                 std::free(m_data);
                 std::free(m_ledger);
             }
-    
+            
+            /**
+             * @brief 
+             * Tests if a pointer belongs to this bucket
+             * @param ptr 
+             * @return true 
+             * @return false 
+             */
+            bool belongs(void* ptr) const noexcept{
+                std::byte* lower_boundary = m_data;
+                std::byte* upper_boundary = m_data + (BlockSize * BlockCount);
+
+                return ((ptr >= lower_boundary) && (ptr < upper_boundary));
+            }
+
             /**
              * @brief The `allocate` takes the amount of bytes,
              * calculates the amount of blocks it would take. 
@@ -56,10 +72,17 @@ namespace dev::common{
                 std::size_t num_blocks = 1 + ( (bytes - 1)/ BlockSize );
         
                 std::size_t next_free_index = find_contiguous_blocks(num_blocks);
+
+                if(next_free_index == BlockCount)
+                    return nullptr;
         
                 set_blocks_in_use(next_free_index, num_blocks);
-        
-                return m_data + (next_free_index * BlockSize);
+                
+                void* ptr_to_newly_alloc_mem = m_data + (next_free_index * BlockSize);
+
+                std::cout << "\n" << "Allocated " << bytes 
+                << " bytes at " << ptr_to_newly_alloc_mem << std::endl;
+                return ptr_to_newly_alloc_mem;
             }
     
             /**
@@ -80,31 +103,41 @@ namespace dev::common{
     
                 // Update the ledger
                 set_blocks_free(index, num_blocks);
+                std::cout << "\n" << "Deallocated " << bytes 
+                << " bytes at address " << block_offset << std::endl;;
             }
-    
+            
+            /**
+             * @brief 
+             * Finds `n` free contigous blocks in the bucket and returns the first
+             * block's index or `BlockCount` on failure.
+             * @param n 
+             * Number of free contigous blocks requested.
+             * @return std::size_t 
+             */
             std::size_t find_contiguous_blocks(std::size_t n) noexcept{
                 
                 int num_free_blocks_found_ctr{0};
                 std::size_t index{0};
                 std::size_t first_free_block_index_in_free_area_found{0};
-        
-                for(int i{0};i < BlockCount; ++i){
-                    if(m_ledger[i].all())
-                            continue;
-        
-                    for(int j{0}; j<BlockSize; ++j){
+                const auto ledger_size = 1 + ((BlockCount - 1) / 8);
+                
+                int j{0};
+                for(int i{0}; i<ledger_size;++i){
+                    for(int j{0};j<8;++j)
+                    {
                         if(!m_ledger[i].test(j))
+                        {
                             ++num_free_blocks_found_ctr;
-                        else{
-                            num_free_blocks_found_ctr = 0;
-                            first_free_block_index_in_free_area_found=index;
                         }
-                            
-                        
+                        else{
+                            first_free_block_index_in_free_area_found = index + 1;
+                            num_free_blocks_found_ctr = 0;
+                        }
+
                         if(num_free_blocks_found_ctr >= n)
                             return first_free_block_index_in_free_area_found;
-        
-                        index++;
+                        ++index;
                     }
                 }
         
@@ -130,6 +163,7 @@ namespace dev::common{
                 std::size_t bitset_index{first_bit_to_set};
         
                 while(i < n)
+                {
                     m_ledger[ledger_index].set(bitset_index, set_or_clear_flag);
                     // Bitwise & is much faster than modulo, which can take
                     // 40-50 CPU cycles. a % b where b = 2^n, can be implemented
@@ -139,34 +173,8 @@ namespace dev::common{
                         ++ledger_index;
                     
                     ++i;
+                }
             }
-        
-            void set_blocks_free(std::size_t index, std::size_t n) noexcept{
-                set_blocks_status(index, n, false);
-            }
-        
-            void set_blocks_in_use(std::size_t index, std::size_t n) noexcept{
-                set_blocks_status(index, n, true);
-            }
-
-        private:
-            /**
-             * @brief 
-             * Finds `n` free contigous blocks in the bucket and returns the first
-             * block's index or `BlockCount` on failure.
-             * @param n 
-             * Number of free contigous blocks requested.
-             * @return std::size_t 
-             */
-            std::size_t find_contiguous_blocks(std::size_t n) noexcept;
-
-            /**
-             * @brief Marks `n` blocks in the ledger as in-use starting 
-             * at the `index`.
-             * @param index 
-             * @param n 
-             */
-            void set_blocks_in_use(std::size_t index, std::size_t n) noexcept;
 
             /**
              * @brief Marks `n` blocks in the ledger as free starting
@@ -174,10 +182,21 @@ namespace dev::common{
              * @param index 
              * @param n 
              */
-            void set_blocks_free(std::size_t index, std::size_t n) noexcept;
+            void set_blocks_free(std::size_t index, std::size_t n) noexcept{
+                set_blocks_status(index, n, false);
+            }
             
-            void set_blocks_status(std::size_t index, std::size_t n, 
-                bool set_or_clear_flag) noexcept;
+            /**
+             * @brief Marks `n` blocks in the ledger as in-use starting 
+             * at the `index`.
+             * @param index 
+             * @param n 
+             */
+            void set_blocks_in_use(std::size_t index, std::size_t n) noexcept{
+                set_blocks_status(index, n, true);
+            }
+
+        private:
             /**
              * @brief 
              * The pointer to data, which is the memory area itself which
