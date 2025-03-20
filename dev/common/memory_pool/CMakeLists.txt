@@ -7,6 +7,8 @@ project(memory_pool     # name of the project
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
 
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+
 # Enable debug information
 set(CMAKE_BUILD_TYPE Debug)
 
