@@ -10,7 +10,11 @@ set(source_files
     src/memory_pool_tests.cpp
 )
 
+set(BINARY ${CMAKE_PROJECT_NAME})
+
 add_executable(memory_pool_tests ${source_files})
+
+add_test(NAME ${BINARY} COMMAND ${BINARY})
 
 # Include the memory_pool headers
 target_include_directories(memory_pool_tests  

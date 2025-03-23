@@ -80,8 +80,8 @@ namespace dev::common{
                 
                 void* ptr_to_newly_alloc_mem = m_data + (next_free_index * BlockSize);
 
-                std::cout << "\n" << "Allocated " << bytes 
-                << " bytes at " << ptr_to_newly_alloc_mem << std::endl;
+                //std::cout << "\n" << "Allocated " << bytes 
+                //<< " bytes at " << ptr_to_newly_alloc_mem << std::endl;
                 return ptr_to_newly_alloc_mem;
             }
     
@@ -103,8 +103,8 @@ namespace dev::common{
     
                 // Update the ledger
                 set_blocks_free(index, num_blocks);
-                std::cout << "\n" << "Deallocated " << bytes 
-                << " bytes at address " << block_offset << std::endl;;
+                //std::cout << "\n" << "Deallocated " << bytes 
+                //<< " bytes at address " << block_offset << std::endl;;
             }
             
             /**

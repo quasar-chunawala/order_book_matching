@@ -100,6 +100,8 @@ namespace dev::common{
             : MemoryPool(std::make_index_sequence<bucket_count>{})
             {}
 
+        MemoryPool(MemoryPool const &) = delete; 
+        MemoryPool& operator=(MemoryPool const &) = delete;
 
         /**
          * @note

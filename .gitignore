@@ -45,6 +45,5 @@ _deps
 CMakeUserPresets.json
 launch.json
 tasks.json
-settings.json
 
 [Bb][Uu][Ii][Ll][Dd]/
