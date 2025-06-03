@@ -6,7 +6,7 @@
 #include <cstring>
 #include <iostream>
 
-namespace dev::common{
+namespace dev{
     /**
      * @brief 
      * A bucket is a collection of homgenous fixed-size blocks.

@@ -1,16 +1,22 @@
-cmake_minimum_required(VERSION 3.25)
-project(tachyon VERSION 1.0.0)
+cmake_minimum_required(VERSION 3.27)
 
+# Project name
+project(order_book_matching)
+
+# Set the C++ standard
 set(CMAKE_CXX_STANDARD 23)
-set(CMAKE_CXX_STANDARD_REQUIRED True)
-set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-set(CMAKE_BUILD_TYPE Debug)
+# Enable testing
+enable_testing()
 
-# Add Google Test
+# Add GoogleTest to the project
 add_subdirectory(ext/googletest)
 
-# Add subprojects
-add_subdirectory(dev/common/memory_pool)
-add_subdirectory(dev/common/memory_pool_tests)
+# Global include directories for all test projects
+include_directories(
+    ${gtest_SOURCE_DIR}/include
+    ${CMAKE_SOURCE_DIR}/include
+)
 
+add_subdirectory(test/spsc_queue_tests)

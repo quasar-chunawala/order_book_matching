@@ -15,7 +15,7 @@
  * - It avoids memory fragmentation with accurately-sized buckets
  * - It is easy to implement, understand and reason about.
  */
-namespace dev::common{
+namespace dev{
     /**
      * @brief A helper structure that stores 
      * info on what-if we used to this bucket to allocate

@@ -18,7 +18,7 @@
  * of such a collection.
  */
 
-namespace dev::common{
+namespace dev{
     template<std::size_t id>
     struct bucket_descriptors{
         using type = std::tuple<>;
