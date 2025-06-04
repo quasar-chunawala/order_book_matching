@@ -29,16 +29,14 @@ namespace dev{
         std::atomic<int> m_write_index{ 0 };
 
         public:
-        spsc_queue() : spsc_queue(16){}
+        spsc_queue() : spsc_queue(0){}
         spsc_queue(const spsc_queue&) = delete;
         spsc_queue& operator=(const spsc_queue&) = delete;
 
         spsc_queue(std::size_t runtime_capacity)
         : m_capacity{runtime_capacity}
-        , m_buffer{}
-        {
-            m_buffer.resize(runtime_capacity);
-        }
+        , m_buffer{std::vector<T>(runtime_capacity, T())}
+        {}
         /**
          * @brief pushes an element onto the ringbuffer.
          * @param `element` will be pushed to the queue unless the queue is not full
