@@ -75,9 +75,3 @@ TEST(memory_pool_tests, Exhaustion)
     for(void* ptr : allocations)
         pool.deallocate(ptr,1);
 }
-    
-int main(int argc, char** argv)
-{
-    ::testing::InitGoogleTest(&argc, argv);
-    return RUN_ALL_TESTS();
-}

@@ -6,7 +6,7 @@ TEST(SPSCQueueTest, PushAndPop) {
 
     // Push elements onto the queue
     for(int i{0}; i<7; ++i){
-        queue.try_push(i+1);
+        queue.try_push( i+1 );
     }
 
     for(int i{0}; i<7; ++i){

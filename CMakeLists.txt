@@ -20,3 +20,4 @@ include_directories(
 )
 
 add_subdirectory(test/spsc_queue_tests)
+add_subdirectory(test/memory_pool_tests)
