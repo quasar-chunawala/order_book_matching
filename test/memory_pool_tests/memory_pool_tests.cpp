@@ -43,7 +43,7 @@ TEST(memory_pool_tests, MultipleAllocations)
 TEST(memory_pool_tests, MultipleAllocationsFromSameBucket)
 {
     /* Multiple allocations from the same bucket */
-    MemoryPool pool;
+    dev::MemoryPool pool;
     void* ptr1 = pool.allocate(1);
     void* ptr2 = pool.allocate(1);
     void* ptr3 = pool.allocate(1);
