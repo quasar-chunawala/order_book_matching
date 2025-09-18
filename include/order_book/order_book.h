@@ -81,7 +81,7 @@ class OrderBook
     }
 
     OrderBook(OrderBook&& other)
-      : m_symbol{ std::exchange(other.m_symbol, "") }
+      : m_symbol{ std::exchange(other.m_symbol, {}) }
       , m_bids{ std::exchange(other.m_bids, {}) }
       , m_asks{ std::exchange(other.m_asks, {}) }
       , m_order_entries{ std::exchange(other.m_order_entries, {}) }
