@@ -118,7 +118,7 @@ class OrderBook
             loc = std::upper_bound(price_levels.begin(),
                                    price_levels.end(),
                                    price,
-                                   [](PriceLevel& price_level, Price value) {
+                                   [](Price value, PriceLevel& price_level) {
                                        return price_level.get_price() > value;
                                    });
         }
