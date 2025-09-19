@@ -100,12 +100,29 @@ class OrderBook
                                 const OrderQueue& order_queue)
     {
         if (price_levels.size() == 0) {
-            m_bids.emplace_back(level_type, price, order_queue);
+            price_levels.emplace_back(level_type, price, order_queue);
             return;
         }
 
-        auto loc = find_insert_location(price_levels, price);
-        m_bids.insert(loc, PriceLevel(level_type, price, order_queue));
+        PriceLevels::iterator loc;
+        if (level_type == LevelType::BID) {
+            // m_bids.back() is the highest bid
+            loc = std::lower_bound(price_levels.begin(),
+                                   price_levels.end(),
+                                   price,
+                                   [](PriceLevel& price_level, Price value) {
+                                       return price_level.get_price() < value;
+                                   });
+        } else {
+            // m_asks.back() is the lowest ask
+            loc = std::upper_bound(price_levels.begin(),
+                                   price_levels.end(),
+                                   price,
+                                   [](PriceLevel& price_level, Price value) {
+                                       return price_level.get_price() > value;
+                                   });
+        }
+        price_levels.insert(loc, PriceLevel(level_type, price, order_queue));
     }
     /**
      * @brief Adds a price level
@@ -270,18 +287,37 @@ class OrderBook
 
                 auto& executing_order = bid_;
                 auto& reducing_order = ask_;
+
                 if (executing_order.remaining_quantity >
                     reducing_order.remaining_quantity) {
                     std::swap(executing_order, reducing_order);
                 }
 
+                OrderId executing_order_id = executing_order.order_id;
+                OrderId reducing_order_id = reducing_order.order_id;
+
                 if (executing_order.order_id == bid_.order_id) {
                     best_bid_price_level.fill_order(reducing_order);
+
+                    if (reducing_order.remaining_quantity == 0) {
+                        best_ask_price_level.pop_front();
+
+                        auto it = get_order_entry(executing_order_id);
+                        m_order_entries.erase(it);
+                    }
                 } else {
                     best_ask_price_level.fill_order(reducing_order);
+                    if (reducing_order.remaining_quantity == 0) {
+                        best_bid_price_level.pop_front();
+
+                        auto it = get_order_entry(reducing_order_id);
+                        m_order_entries.erase(it);
+                    }
                 }
-                auto order_entry_it = get_order_entry(executing_order.order_id);
+
+                auto order_entry_it = get_order_entry(executing_order_id);
                 m_order_entries.erase(order_entry_it);
+
                 trades.push_back(Trade{ TradeInfo{
                                           .fill_type = FillType::Full,
                                           .user_id = executing_order.user_id,
@@ -294,6 +330,14 @@ class OrderBook
                                                    .order_id = reducing_order.order_id,
                                                    .price = reducing_order.price,
                                                    .quantity = fill_quantity } });
+            }
+
+            if (best_bid_price_level.get_count() == 0) {
+                m_bids.pop_back();
+            }
+
+            if (best_ask_price_level.get_count() == 0) {
+                m_asks.pop_back();
             }
         }
 
