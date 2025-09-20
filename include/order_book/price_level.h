@@ -116,9 +116,9 @@ class PriceLevel
         return *it;
     }
 
-    void add_order(const Order& order)
+    void add_order(Order order)
     {
-        m_price_level_orders.emplace_back(order);
+        m_price_level_orders.push_back(order);
         ++m_count;
         m_total_volume += order.initial_quantity;
     }
@@ -141,9 +141,11 @@ class PriceLevel
         if (it == m_price_level_orders.end()) {
             throw std::logic_error("Error fetching the requested Order Id!");
         }
-        m_count -= 1;
-        m_total_volume -= it->remaining_quantity;
+
+        Quantity cancel_quantity = it->remaining_quantity;
         m_price_level_orders.erase(it);
+        m_total_volume -= cancel_quantity;
+        m_count -= 1;
     }
 
     void pop_front()

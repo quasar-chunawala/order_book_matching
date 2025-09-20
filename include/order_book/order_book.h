@@ -27,36 +27,43 @@ using PriceLevels = std::vector<PriceLevel>;
 struct OrderEntry
 {
     OrderId order_id;
-    PriceLevel* price_level;
+    Symbol symbol;
+    Price price;
+    Side side;
 };
 
 class OrderBook
 {
 
-    auto find_insert_location(const std::vector<PriceLevel>& price_levels, Price price)
+    auto find_insert_location(PriceLevels& price_levels,
+                              LevelType level_type,
+                              Price price)
     {
         // Empty queue
         if (price_levels.size() == 0)
             return price_levels.end();
 
-        auto low = price_levels.begin();
-        auto high = price_levels.end();
-        auto mid = price_levels.begin() + std::distance(low, high) / 2;
+        PriceLevels::iterator pos;
 
-        while (low < high) {
-            if (price < mid->get_price())
-                high = mid;
-
-            if (price > mid->get_price())
-                low = mid;
-
-            if (price == mid->get_price()) {
-                throw std::logic_error(
-                  "Price level is already present in the order book");
-            }
+        if (level_type == LevelType::BID) {
+            // m_bids.back() is the highest bid
+            pos = std::lower_bound(price_levels.begin(),
+                                   price_levels.end(),
+                                   price,
+                                   [](PriceLevel& price_level, Price value) {
+                                       return price_level.get_price() < value;
+                                   });
+        } else {
+            // m_asks.back() is the lowest ask
+            pos = std::lower_bound(price_levels.begin(),
+                                   price_levels.end(),
+                                   price,
+                                   [](PriceLevel& price_level, Price value) {
+                                       return price_level.get_price() > value;
+                                   });
         }
 
-        return high;
+        return pos;
     }
 
   public:
@@ -67,8 +74,9 @@ class OrderBook
           .count();
     }
 
-    OrderBook(Symbol symbol)
+    OrderBook(Symbol symbol, std::deque<OrderEntry>& order_entries)
       : m_symbol{ symbol }
+      , m_order_entries{ order_entries }
     {
     }
 
@@ -84,7 +92,7 @@ class OrderBook
       : m_symbol{ std::exchange(other.m_symbol, {}) }
       , m_bids{ std::exchange(other.m_bids, {}) }
       , m_asks{ std::exchange(other.m_asks, {}) }
-      , m_order_entries{ std::exchange(other.m_order_entries, {}) }
+      , m_order_entries{ other.m_order_entries }
     {
     }
 
@@ -94,20 +102,15 @@ class OrderBook
         return *this;
     }
 
-    void add_price_level_helper(LevelType level_type,
-                                Price price,
-                                std::vector<PriceLevel>& price_levels,
-                                const OrderQueue& order_queue)
+    auto get_price_level_iter(LevelType level_type, Price price)
     {
-        if (price_levels.size() == 0) {
-            price_levels.emplace_back(level_type, price, order_queue);
-            return;
-        }
+        PriceLevels& price_levels = level_type == LevelType::BID ? m_bids : m_asks;
 
-        PriceLevels::iterator loc;
+        PriceLevels::iterator pos{};
+
         if (level_type == LevelType::BID) {
             // m_bids.back() is the highest bid
-            loc = std::lower_bound(price_levels.begin(),
+            pos = std::lower_bound(price_levels.begin(),
                                    price_levels.end(),
                                    price,
                                    [](PriceLevel& price_level, Price value) {
@@ -115,15 +118,31 @@ class OrderBook
                                    });
         } else {
             // m_asks.back() is the lowest ask
-            loc = std::upper_bound(price_levels.begin(),
+
+            pos = std::lower_bound(price_levels.begin(),
                                    price_levels.end(),
                                    price,
-                                   [](Price value, PriceLevel& price_level) {
+                                   [](PriceLevel& price_level, Price value) {
                                        return price_level.get_price() > value;
                                    });
         }
-        price_levels.insert(loc, PriceLevel(level_type, price, order_queue));
+
+        if (pos != price_levels.end())
+            if (pos->get_price() != price)
+                return price_levels.end();
+
+        std::cout << "\n" << "pos = " << std::distance(price_levels.begin(), pos);
+        return pos;
     }
+
+    PriceLevels& get_price_levels(LevelType level_type)
+    {
+        if (level_type == LevelType::BID)
+            return m_bids;
+        else
+            return m_asks;
+    }
+
     /**
      * @brief Adds a price level
      */
@@ -131,25 +150,9 @@ class OrderBook
                          Price price,
                          const OrderQueue& order_queue = std::deque<Order>{})
     {
-        if (type == LevelType::BID) {
-            add_price_level_helper(LevelType::BID, price, m_bids, order_queue);
-        } else {
-            add_price_level_helper(LevelType::ASK, price, m_asks, order_queue);
-        }
-    }
-
-    void delete_price_level_helper(Price price, std::vector<PriceLevel>& price_levels)
-    {
-        auto pos = std::lower_bound(price_levels.begin(),
-                                    price_levels.end(),
-                                    price,
-                                    [](PriceLevel& price_level, Price value) {
-                                        return price_level.get_price() < value;
-                                    });
-
-        if (pos != price_levels.end()) {
-            m_bids.erase(pos);
-        }
+        PriceLevels& price_levels = type == LevelType::BID ? m_bids : m_asks;
+        PriceLevels::iterator pos = find_insert_location(price_levels, type, price);
+        price_levels.insert(pos, PriceLevel{ type, price, order_queue });
     }
 
     /**
@@ -157,38 +160,25 @@ class OrderBook
      */
     void delete_price_level(LevelType type, Price price)
     {
-        if (type == LevelType::BID) {
-            delete_price_level_helper(price, m_bids);
-        } else {
-            delete_price_level_helper(price, m_asks);
-        }
+        PriceLevels& price_levels = type == LevelType::BID ? m_bids : m_asks;
+        PriceLevels::iterator pos = get_price_level_iter(type, price);
+        price_levels.erase(pos);
     }
 
-    PriceLevel* get_bid_price_level(Price price)
+    PriceLevel& get_bid_price_level(Price price)
     {
         return get_price_level(LevelType::BID, price);
     }
 
-    PriceLevel* get_ask_price_level(Price price)
+    PriceLevel& get_ask_price_level(Price price)
     {
         return get_price_level(LevelType::ASK, price);
     }
 
-    PriceLevel* get_price_level(LevelType level_type, Price price)
+    PriceLevel& get_price_level(LevelType level_type, Price price)
     {
-        PriceLevels& price_levels = (level_type == LevelType::BID) ? m_bids : m_asks;
-        // Find the price level matching the order price
-        auto pos = std::lower_bound(price_levels.begin(),
-                                    price_levels.end(),
-                                    price,
-                                    [](PriceLevel& price_level, Price value) {
-                                        return price_level.get_price() < value;
-                                    });
-
-        if (pos == price_levels.end()) {
-            return nullptr;
-        }
-        return std::addressof(*pos);
+        PriceLevels::iterator pos = get_price_level_iter(level_type, price);
+        return *pos;
     }
 
     bool is_match_possible(Side side, Price price)
@@ -219,35 +209,42 @@ class OrderBook
     /**
      * @brief Add an order to the order book
      */
-    Trades add_order(const Order& order)
+    Trades add_order(Order order)
     {
         Side side = order.side;
         Price price = order.price;
         LevelType level_type = side == 'B' ? LevelType::BID : LevelType::ASK;
-        PriceLevel* price_level = get_price_level(level_type, price);
+        PriceLevels& price_levels = level_type == LevelType::BID ? m_bids : m_asks;
+        PriceLevels::iterator it = get_price_level_iter(level_type, price);
 
-        if (!price_level) {
+        if (it == price_levels.end()) {
             add_price_level(level_type, price);
-            price_level = get_price_level(level_type, price);
+            it = get_price_level_iter(level_type, price);
         }
+
+        PriceLevel& price_level = *it;
 
         if (order.order_type == OrderType::FILL_OR_KILL &&
             !is_match_possible(order.side, order.price))
             return {};
 
-        price_level->add_order(order);
-        m_order_entries.push_back(
-          OrderEntry{ .order_id = order.order_id, .price_level = price_level });
+        price_level.add_order(order);
+        m_order_entries.push_back(OrderEntry{
+          .order_id = order.order_id,
+          .symbol = order.symbol,
+          .price = order.price,
+          .side = side,
+        });
         return match();
     }
 
-    const PriceLevel* get_best_bid() const { return std::addressof(m_bids.back()); }
+    const PriceLevel& get_best_bid() const { return m_bids.back(); }
 
-    PriceLevel* get_best_bid() { return std::addressof(m_bids.back()); }
+    PriceLevel& get_best_bid() { return m_bids.back(); }
 
-    const PriceLevel* get_best_ask() const { return std::addressof(m_asks.back()); }
+    const PriceLevel& get_best_ask() const { return m_asks.back(); }
 
-    PriceLevel* get_best_ask() { return std::addressof(m_asks.back()); }
+    PriceLevel& get_best_ask() { return m_asks.back(); }
 
     auto get_order_entry(OrderId order_id)
     {
@@ -366,7 +363,7 @@ class OrderBook
         return trades;
     }
 
-    void cancel_order(OrderId order_id)
+    PriceLevel& order_id_to_price_level(OrderId order_id)
     {
         auto order_entry_iter = get_order_entry(order_id);
 
@@ -374,35 +371,37 @@ class OrderBook
             throw std::logic_error("Order Id not found");
         }
 
-        OrderEntry& order_entry = *order_entry_iter;
-        PriceLevel* price_level_ptr = order_entry.price_level;
+        OrderEntry order_entry = *order_entry_iter;
+        LevelType level_type = order_entry.side == 'B' ? LevelType::BID : LevelType::ASK;
+        PriceLevel& price_level = get_price_level(level_type, order_entry.price);
+        return price_level;
+    }
 
-        price_level_ptr->cancel_order(order_id);
+    void cancel_order(OrderId order_id)
+    {
+        PriceLevel& price_level = order_id_to_price_level(order_id);
+
+        price_level.cancel_order(order_id);
         auto order_entry_it = get_order_entry(order_id);
         m_order_entries.erase(order_entry_it);
     }
 
+    Order get_order(OrderId order_id)
+    {
+        PriceLevel& price_level = order_id_to_price_level(order_id);
+        Order order = price_level.get_order(order_id);
+        return order;
+    }
+
     void modify_order(OrderId order_id, Price new_price, Quantity quantity)
     {
-        auto order_entry_iter = get_order_entry(order_id);
+        PriceLevel& price_level = order_id_to_price_level(order_id);
+        Order old_order = price_level.get_order(order_id);
 
-        if (order_entry_iter == m_order_entries.end()) {
-            throw std::logic_error("Order Id not found");
-        }
-
-        OrderEntry& order_entry = *order_entry_iter;
-        PriceLevel* price_level_ptr = order_entry.price_level;
-
-        price_level_ptr->cancel_order(order_id);
+        price_level.cancel_order(order_id);
         auto order_entry_it = get_order_entry(order_id);
         m_order_entries.erase(order_entry_it);
 
-        // if(price_level_ptr->get_price() == new_price){
-        //     price_level_ptr->modify_order(order_id, quantity);
-        // }
-        // else
-        //{
-        Order old_order = price_level_ptr->get_order(order_id);
         add_order(Order{
           .order_type = old_order.order_type,
           .order_id = generate_order_id(),
@@ -425,11 +424,11 @@ class OrderBook
     std::vector<PriceLevel> m_bids;
     // Sell orders sorted by price (lowest first)
     std::vector<PriceLevel> m_asks;
-    // All orders sorted by OrderId
-    std::deque<OrderEntry> m_order_entries;
+    // Reference to vector of order entries (sorted by OrderId)
+    std::deque<OrderEntry>& m_order_entries;
 };
 
-using OrderBookPtr = OrderBook*;
+using OrderBooks = std::vector<OrderBook>;
 } // namespace dev
 
 #endif
