@@ -2,18 +2,21 @@
 #define TRADEINFO_H
 #include "order.h"
 
-enum class FillType{
+enum class FillType
+{
     Partial,
     Full,
 };
 
-namespace dev{
-    struct TradeInfo{
-        FillType fill_type;
-        UserId user_id;
-        OrderId order_id;
-        Price price;
-        Quantity quantity;
-    };
+namespace dev {
+struct TradeInfo
+{
+    FillType fill_type;
+    UserId user_id;
+    OrderId order_id;
+    Symbol symbol;
+    Price price;
+    Quantity quantity;
+};
 }
 #endif

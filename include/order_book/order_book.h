@@ -292,6 +292,8 @@ class OrderBook
 
                 OrderId executing_order_id = executing_order.order_id;
                 OrderId reducing_order_id = reducing_order.order_id;
+                Quantity reducing_order_remaining_quantity =
+                  reducing_order.remaining_quantity;
 
                 if (executing_order.order_id == bid_.order_id) {
                     best_bid_price_level.fill_order(reducing_order);
@@ -315,18 +317,24 @@ class OrderBook
                 auto order_entry_it = get_order_entry(executing_order_id);
                 m_order_entries.erase(order_entry_it);
 
-                trades.push_back(Trade{ TradeInfo{
-                                          .fill_type = FillType::Full,
-                                          .user_id = executing_order.user_id,
-                                          .order_id = executing_order.order_id,
-                                          .price = executing_order.price,
-                                          .quantity = fill_quantity,
-                                        },
-                                        TradeInfo{ .fill_type = FillType::Partial,
-                                                   .user_id = reducing_order.user_id,
-                                                   .order_id = reducing_order.order_id,
-                                                   .price = reducing_order.price,
-                                                   .quantity = fill_quantity } });
+                trades.push_back(
+                  Trade{ TradeInfo{
+                           .fill_type = FillType::Full,
+                           .user_id = executing_order.user_id,
+                           .order_id = executing_order.order_id,
+                           .symbol = executing_order.symbol,
+                           .price = executing_order.price,
+                           .quantity = fill_quantity,
+                         },
+                         TradeInfo{ .fill_type =
+                                      reducing_order_remaining_quantity == fill_quantity
+                                        ? FillType::Full
+                                        : FillType::Partial,
+                                    .user_id = reducing_order.user_id,
+                                    .order_id = reducing_order.order_id,
+                                    .symbol = reducing_order.symbol,
+                                    .price = reducing_order.price,
+                                    .quantity = fill_quantity } });
             }
 
             if (best_bid_price_level.get_count() == 0) {
