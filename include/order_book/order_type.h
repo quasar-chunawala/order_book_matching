@@ -3,14 +3,16 @@
 
 #include <iostream>
 
-namespace dev{
-    enum class OrderType{
-        MARKET,
-        LIMIT,
-        //STOP,
-        //STOP_LIMIT,
-        FILL_OR_KILL,
-        //GOOD_TILL_CANCEL
-    };
+namespace dev {
+enum class OrderType
+{
+    MARKET,
+    LIMIT,
+    // STOP,
+    // STOP_LIMIT,
+    FILL_AND_KILL,
+    FILL_OR_KILL,
+    GOOD_FOR_DAY,
+};
 };
 #endif

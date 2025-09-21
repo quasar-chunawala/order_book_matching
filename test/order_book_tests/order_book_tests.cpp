@@ -1,3 +1,4 @@
+#include "formatter.h"
 #include "market_data_manager.h"
 #include "order.h"
 #include "order_book.h"
@@ -9,33 +10,15 @@
 #include <gtest/gtest.h>
 #include <string_view>
 
-// Formatter for TradeInfo (already present in your file)
-template<>
-struct std::formatter<dev::TradeInfo> : std::formatter<std::string_view>
-{
-    auto format(const dev::TradeInfo& t, auto& ctx) const
-    {
-        std::string s = std::format("TradeInfo{{fill_type={}, user_id={}, order_id={}, "
-                                    "symbol={}, price={}, quantity={}}}",
-                                    t.fill_type == FillType::Full ? "Full" : "Partial",
-                                    t.user_id,
-                                    t.order_id,
-                                    t.symbol.m_symbol_name,
-                                    t.price,
-                                    t.quantity);
-        return std::formatter<std::string_view>::format(s, ctx);
-    }
-};
-
 using namespace dev;
 
-TEST(order_book_tests, MarketOrder_Match_FullFill)
+TEST(order_book_tests, LimitOrder_Match_FullFill)
 {
     Symbol MSFT{ 1, "MSFT" };
     MarketDataManager mm;
+    mm.add_order_book(MSFT);
 
-    // Buy order
-    Order buy{ .order_type = OrderType::MARKET,
+    Order buy{ .order_type = OrderType::LIMIT,
                .order_id = 1,
                .user_id = "buyer",
                .side = 'B',
@@ -44,8 +27,7 @@ TEST(order_book_tests, MarketOrder_Match_FullFill)
                .initial_quantity = 100,
                .remaining_quantity = 100 };
 
-    // Sell order
-    Order sell{ .order_type = OrderType::MARKET,
+    Order sell{ .order_type = OrderType::LIMIT,
                 .order_id = 2,
                 .user_id = "seller",
                 .side = 'S',
@@ -54,24 +36,27 @@ TEST(order_book_tests, MarketOrder_Match_FullFill)
                 .initial_quantity = 100,
                 .remaining_quantity = 100 };
 
-    auto trades1 = mm.add_market_order(buy);
-    auto trades2 = mm.add_market_order(sell);
+    mm.add_order(buy);
+    auto trades = mm.add_order(sell);
 
-    // The match should occur after the second order
-    ASSERT_TRUE(trades2.size() == 1);
-    EXPECT_EQ(trades2[0].get_bid_order().quantity, 100);
-    EXPECT_EQ(trades2[0].get_ask_order().quantity, 100);
-    EXPECT_EQ(trades2[0].get_bid_order().fill_type, FillType::Full);
-    EXPECT_EQ(trades2[0].get_ask_order().fill_type, FillType::Full);
+    ASSERT_EQ(trades.size(), 1);
+
+    std::string expected_bid =
+      std::format("{}", TradeInfo{ FillType::Full, "buyer", 1, MSFT, 100, 100 });
+    std::string expected_ask =
+      std::format("{}", TradeInfo{ FillType::Full, "seller", 2, MSFT, 100, 100 });
+
+    EXPECT_EQ(std::format("{}", trades[0].executing_order), expected_bid);
+    EXPECT_EQ(std::format("{}", trades[0].reducing_order), expected_ask);
 }
 
-TEST(order_book_tests, MarketOrder_Match_PartialFill)
+TEST(order_book_tests, LimitOrder_Match_PartialFill)
 {
     Symbol MSFT{ 1, "MSFT" };
     MarketDataManager mm;
+    mm.add_order_book(MSFT);
 
-    // Buy order (smaller quantity)
-    Order buy{ .order_type = OrderType::MARKET,
+    Order buy{ .order_type = OrderType::LIMIT,
                .order_id = 1,
                .user_id = "buyer",
                .side = 'B',
@@ -80,8 +65,7 @@ TEST(order_book_tests, MarketOrder_Match_PartialFill)
                .initial_quantity = 50,
                .remaining_quantity = 50 };
 
-    // Sell order (larger quantity)
-    Order sell{ .order_type = OrderType::MARKET,
+    Order sell{ .order_type = OrderType::LIMIT,
                 .order_id = 2,
                 .user_id = "seller",
                 .side = 'S',
@@ -90,23 +74,27 @@ TEST(order_book_tests, MarketOrder_Match_PartialFill)
                 .initial_quantity = 100,
                 .remaining_quantity = 100 };
 
-    auto trades1 = mm.add_market_order(buy);
-    auto trades2 = mm.add_market_order(sell);
+    mm.add_order(buy);
+    auto trades = mm.add_order(sell);
 
-    ASSERT_TRUE(trades2.size() == 1);
-    EXPECT_EQ(trades2[0].get_bid_order().quantity, 50);
-    EXPECT_EQ(trades2[0].get_ask_order().quantity, 50);
-    EXPECT_EQ(trades2[0].get_bid_order().fill_type, FillType::Full);
-    EXPECT_EQ(trades2[0].get_ask_order().fill_type, FillType::Partial);
+    ASSERT_EQ(trades.size(), 1);
+
+    std::string expected_bid =
+      std::format("{}", TradeInfo{ FillType::Full, "buyer", 1, MSFT, 100, 50 });
+    std::string expected_ask =
+      std::format("{}", TradeInfo{ FillType::Partial, "seller", 2, MSFT, 100, 50 });
+
+    EXPECT_EQ(std::format("{}", trades[0].executing_order), expected_bid);
+    EXPECT_EQ(std::format("{}", trades[0].reducing_order), expected_ask);
 }
 
-TEST(order_book_tests, MarketOrder_NoMatch)
+TEST(order_book_tests, LimitOrder_NoMatch)
 {
     Symbol MSFT{ 1, "MSFT" };
     MarketDataManager mm;
+    mm.add_order_book(MSFT);
 
-    // Buy order at price 99
-    Order buy{ .order_type = OrderType::MARKET,
+    Order buy{ .order_type = OrderType::LIMIT,
                .order_id = 1,
                .user_id = "buyer",
                .side = 'B',
@@ -115,8 +103,7 @@ TEST(order_book_tests, MarketOrder_NoMatch)
                .initial_quantity = 100,
                .remaining_quantity = 100 };
 
-    // Sell order at price 101
-    Order sell{ .order_type = OrderType::MARKET,
+    Order sell{ .order_type = OrderType::LIMIT,
                 .order_id = 2,
                 .user_id = "seller",
                 .side = 'S',
@@ -125,20 +112,19 @@ TEST(order_book_tests, MarketOrder_NoMatch)
                 .initial_quantity = 100,
                 .remaining_quantity = 100 };
 
-    auto trades1 = mm.add_market_order(buy);
-    auto trades2 = mm.add_market_order(sell);
+    mm.add_order(buy);
+    auto trades = mm.add_order(sell);
 
-    // No match should occur
-    ASSERT_TRUE(trades2.empty());
+    ASSERT_TRUE(trades.empty());
 }
 
-TEST(order_book_tests, MarketOrder_MultipleMatches)
+TEST(order_book_tests, LimitOrder_MultipleMatches)
 {
     Symbol MSFT{ 1, "MSFT" };
     MarketDataManager mm;
+    mm.add_order_book(MSFT);
 
-    // Add two buy orders
-    Order buy1{ .order_type = OrderType::MARKET,
+    Order buy1{ .order_type = OrderType::LIMIT,
                 .order_id = 1,
                 .user_id = "buyer1",
                 .side = 'B',
@@ -147,7 +133,7 @@ TEST(order_book_tests, MarketOrder_MultipleMatches)
                 .initial_quantity = 50,
                 .remaining_quantity = 50 };
 
-    Order buy2{ .order_type = OrderType::MARKET,
+    Order buy2{ .order_type = OrderType::LIMIT,
                 .order_id = 2,
                 .user_id = "buyer2",
                 .side = 'B',
@@ -156,11 +142,10 @@ TEST(order_book_tests, MarketOrder_MultipleMatches)
                 .initial_quantity = 50,
                 .remaining_quantity = 50 };
 
-    mm.add_market_order(buy1);
-    mm.add_market_order(buy2);
+    mm.add_order(buy1);
+    mm.add_order(buy2);
 
-    // Add a sell order that matches both buys
-    Order sell{ .order_type = OrderType::MARKET,
+    Order sell{ .order_type = OrderType::LIMIT,
                 .order_id = 3,
                 .user_id = "seller",
                 .side = 'S',
@@ -169,15 +154,61 @@ TEST(order_book_tests, MarketOrder_MultipleMatches)
                 .initial_quantity = 100,
                 .remaining_quantity = 100 };
 
-    auto trades = mm.add_market_order(sell);
+    auto trades = mm.add_order(sell);
 
-    ASSERT_TRUE(trades.size() == 2);
-    EXPECT_EQ(trades[0].get_bid_order().user_id, "buyer1");
-    EXPECT_EQ(trades[1].get_bid_order().user_id, "buyer2");
-    EXPECT_EQ(trades[0].get_ask_order().user_id, "seller");
-    EXPECT_EQ(trades[1].get_ask_order().user_id, "seller");
-    EXPECT_EQ(trades[0].get_bid_order().quantity, 50);
-    EXPECT_EQ(trades[1].get_bid_order().quantity, 50);
-    EXPECT_EQ(trades[0].get_ask_order().quantity, 50);
-    EXPECT_EQ(trades[1].get_ask_order().quantity, 50);
+    ASSERT_EQ(trades.size(), 2);
+
+    std::string expected_bid1 =
+      std::format("{}", TradeInfo{ FillType::Full, "buyer1", 1, MSFT, 100, 50 });
+    std::string expected_bid2 =
+      std::format("{}", TradeInfo{ FillType::Full, "buyer2", 2, MSFT, 100, 50 });
+    std::string expected_ask1 =
+      std::format("{}", TradeInfo{ FillType::Partial, "seller", 3, MSFT, 100, 50 });
+    std::string expected_ask2 =
+      std::format("{}", TradeInfo{ FillType::Partial, "seller", 3, MSFT, 100, 50 });
+
+    EXPECT_EQ(std::format("{}", trades[0].executing_order), expected_bid1);
+    EXPECT_EQ(std::format("{}", trades[1].executing_order), expected_bid2);
+    EXPECT_EQ(std::format("{}", trades[0].reducing_order), expected_ask1);
+    EXPECT_EQ(std::format("{}", trades[1].reducing_order), expected_ask2);
+}
+
+TEST(order_book_tests, MarketOrder_Fill)
+{
+    Symbol MSFT{ 1, "MSFT" };
+    MarketDataManager mm;
+    mm.add_order_book(MSFT);
+
+    std::vector<Order> orders{
+        Order{ OrderType::LIMIT, 1, "buyer1", 'B', MSFT, 95, 50, 50 },
+        Order{ OrderType::LIMIT, 2, "buyer2", 'B', MSFT, 100, 50, 50 },
+        Order{ OrderType::LIMIT, 3, "buyer3", 'B', MSFT, 105, 50, 50 },
+        Order{
+          OrderType::MARKET, 4, "seller", 'S', MSFT, Constants::InvalidPrice, 50, 125 },
+    };
+
+    Trades trades{}, head{}, tail{};
+    for (auto& o : orders) {
+        tail = mm.add_order(o);
+        head.insert(head.end(), tail.begin(), tail.end());
+    }
+    trades = head;
+    EXPECT_EQ(std::format("{}", trades[0].executing_order),
+              "TradeInfo{fill_type=Full, user_id=buyer3, order_id=3, symbol=MSFT, "
+              "price=105, filled_quantity=50}");
+    EXPECT_EQ(std::format("{}", trades[0].reducing_order),
+              "TradeInfo{fill_type=Partial, user_id=seller, order_id=4, symbol=MSFT, "
+              "price=95, filled_quantity=50}");
+    EXPECT_EQ(std::format("{}", trades[1].executing_order),
+              "TradeInfo{fill_type=Full, user_id=buyer2, order_id=2, symbol=MSFT, "
+              "price=100, filled_quantity=50}");
+    EXPECT_EQ(std::format("{}", trades[1].reducing_order),
+              "TradeInfo{fill_type=Partial, user_id=seller, order_id=4, symbol=MSFT, "
+              "price=95, filled_quantity=50}");
+    EXPECT_EQ(std::format("{}", trades[2].executing_order),
+              "TradeInfo{fill_type=Full, user_id=seller, order_id=4, symbol=MSFT, "
+              "price=95, filled_quantity=25}");
+    EXPECT_EQ(std::format("{}", trades[2].reducing_order),
+              "TradeInfo{fill_type=Partial, user_id=buyer1, order_id=1, symbol=MSFT, "
+              "price=95, filled_quantity=25}");
 }

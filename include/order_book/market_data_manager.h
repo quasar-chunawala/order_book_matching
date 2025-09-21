@@ -95,16 +95,22 @@ class MarketDataManager
         return *loc;
     }
 
-    Trades add_market_order(const Order& market_order)
+    Trades add_order(const Order& order)
     {
-        OrderBooks::iterator it = get_order_book_iter(market_order.symbol.m_symbol_name);
+        OrderBooks::iterator it = get_order_book_iter(order.symbol.m_symbol_name);
         // Order book validation
         if (it == m_order_books.end()) {
-            add_order_book(market_order.symbol);
-            it = get_order_book_iter(market_order.symbol.m_symbol_name);
+            add_order_book(order.symbol);
+            it = get_order_book_iter(order.symbol.m_symbol_name);
         }
 
-        return it->add_order(market_order);
+        return it->add_order(order);
+    }
+
+    void cancel_order(OrderId order_id)
+    {
+        PriceLevel& price_level = get_price_level(order_id);
+        price_level.cancel_order(order_id);
     }
 
     auto get_order_entry_iter(OrderId order_id)
@@ -127,6 +133,32 @@ class MarketDataManager
         }
 
         return it;
+    }
+
+    void modify_order(OrderId order_id, Price new_price, Quantity new_quantity)
+    {
+        auto it = get_order_entry_iter(order_id);
+        OrderEntry order_entry = *it;
+        Symbol symbol = order_entry.symbol;
+        OrderBook& order_book = get_order_book(it->symbol.m_symbol_name);
+        Price price = order_entry.price;
+        Order old_order = get_order(order_id);
+
+        if (price == new_price) {
+            PriceLevel& price_level = get_price_level(order_id);
+            price_level.modify_order(order_id, new_quantity);
+            order_book.match();
+        } else {
+            order_book.cancel_order(order_id);
+            order_book.add_order({ .order_type = old_order.order_type,
+                                   .order_id = order_book.generate_order_id(),
+                                   .user_id = old_order.user_id,
+                                   .side = old_order.side,
+                                   .symbol = old_order.symbol,
+                                   .price = new_price,
+                                   .initial_quantity = new_quantity,
+                                   .remaining_quantity = new_quantity });
+        }
     }
 
     Order get_order(OrderId order_id)

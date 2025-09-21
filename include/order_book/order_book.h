@@ -1,19 +1,23 @@
 #ifndef ORDER_BOOK_H
 #define ORDER_BOOK_H
 
+#include "formatter.h"
 #include "order.h"
 #include "order_type.h"
 #include "price_level.h"
 #include "symbol.h"
 #include "trade.h"
+#include "trade_info.h"
 #include <algorithm>
 #include <chrono>
 #include <deque>
+#include <format>
 #include <iostream>
 #include <list>
 #include <map>
 #include <memory>
 #include <optional>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -131,7 +135,6 @@ class OrderBook
             if (pos->get_price() != price)
                 return price_levels.end();
 
-        std::cout << "\n" << "pos = " << std::distance(price_levels.begin(), pos);
         return pos;
     }
 
@@ -213,6 +216,23 @@ class OrderBook
     {
         Side side = order.side;
         Price price = order.price;
+
+        // Handling for MARKET orders
+        if (order.order_type == OrderType::MARKET) {
+            if (order.side == 'B' and !m_asks.empty()) {
+                PriceLevel& worst_ask = m_asks.front();
+                // Convert to a limit order with worst ask price
+                order.order_type = OrderType::LIMIT;
+                order.price = worst_ask.get_price();
+            } else if (order.side == 'S' and !m_bids.empty()) {
+                PriceLevel& worst_bid = m_bids.front();
+                // Convert to a limit order with worst bid price
+                order.order_type = OrderType::LIMIT;
+                order.price = worst_bid.get_price();
+            } else {
+                return {};
+            }
+        }
         LevelType level_type = side == 'B' ? LevelType::BID : LevelType::ASK;
         PriceLevels& price_levels = level_type == LevelType::BID ? m_bids : m_asks;
         PriceLevels::iterator it = get_price_level_iter(level_type, price);
@@ -224,7 +244,7 @@ class OrderBook
 
         PriceLevel& price_level = *it;
 
-        if (order.order_type == OrderType::FILL_OR_KILL &&
+        if (order.order_type == OrderType::FILL_AND_KILL &&
             !is_match_possible(order.side, order.price))
             return {};
 
@@ -292,8 +312,11 @@ class OrderBook
 
                 OrderId executing_order_id = executing_order.order_id;
                 OrderId reducing_order_id = reducing_order.order_id;
-                Quantity reducing_order_remaining_quantity =
-                  reducing_order.remaining_quantity;
+                FillType reducing_order_fill_type =
+                  (fill_quantity == reducing_order.remaining_quantity &&
+                   reducing_order.initial_quantity == reducing_order.remaining_quantity)
+                    ? FillType::Full
+                    : FillType::Partial;
 
                 if (executing_order.order_id == bid_.order_id) {
                     best_bid_price_level.fill_order(reducing_order);
@@ -317,24 +340,34 @@ class OrderBook
                 auto order_entry_it = get_order_entry(executing_order_id);
                 m_order_entries.erase(order_entry_it);
 
+                TradeInfo executing_order_fill_info = TradeInfo{
+                    .fill_type = FillType::Full,
+                    .user_id = executing_order.user_id,
+                    .order_id = executing_order.order_id,
+                    .symbol = executing_order.symbol,
+                    .price = executing_order.price,
+                    .quantity = fill_quantity,
+                };
+
+                TradeInfo reducing_order_fill_info =
+                  TradeInfo{ .fill_type = reducing_order_fill_type,
+                             .user_id = reducing_order.user_id,
+                             .order_id = reducing_order.order_id,
+                             .symbol = reducing_order.symbol,
+                             .price = reducing_order.price,
+                             .quantity = fill_quantity };
+
+                std::string out1_ =
+                  std::format("executing_order_fill_info={}", executing_order_fill_info);
+                std::string out2_ =
+                  std::format("reducing_order_fill_info={}", reducing_order_fill_info);
+
+                std::cout << "\n" << out1_;
+                std::cout << "\n" << out2_;
+                std::cout << "\n";
+
                 trades.push_back(
-                  Trade{ TradeInfo{
-                           .fill_type = FillType::Full,
-                           .user_id = executing_order.user_id,
-                           .order_id = executing_order.order_id,
-                           .symbol = executing_order.symbol,
-                           .price = executing_order.price,
-                           .quantity = fill_quantity,
-                         },
-                         TradeInfo{ .fill_type =
-                                      reducing_order_remaining_quantity == fill_quantity
-                                        ? FillType::Full
-                                        : FillType::Partial,
-                                    .user_id = reducing_order.user_id,
-                                    .order_id = reducing_order.order_id,
-                                    .symbol = reducing_order.symbol,
-                                    .price = reducing_order.price,
-                                    .quantity = fill_quantity } });
+                  Trade{ executing_order_fill_info, reducing_order_fill_info });
             }
 
             if (best_bid_price_level.get_count() == 0) {
@@ -346,12 +379,12 @@ class OrderBook
             }
         }
 
-        // Any FillOrKill orders that were only partially filled
+        // Any FillAndKill orders that were only partially filled
         // should be deleted from the order book
         if (!m_bids.empty()) {
             auto& best_bid_price_level = m_bids.back();
             auto& bid_ = best_bid_price_level.front();
-            if (bid_.order_type == OrderType::FILL_OR_KILL) {
+            if (bid_.order_type == OrderType::FILL_AND_KILL) {
                 best_bid_price_level.cancel_order(bid_.order_id);
                 auto order_entry_it = get_order_entry(bid_.order_id);
                 m_order_entries.erase(order_entry_it);
@@ -361,7 +394,7 @@ class OrderBook
         if (!m_asks.empty()) {
             auto& best_ask_price_level = m_asks.back();
             auto& ask_ = best_ask_price_level.front();
-            if (ask_.order_type == OrderType::FILL_OR_KILL) {
+            if (ask_.order_type == OrderType::FILL_AND_KILL) {
                 best_ask_price_level.cancel_order(ask_.order_id);
                 auto order_entry_it = get_order_entry(ask_.order_id);
                 m_order_entries.erase(order_entry_it);

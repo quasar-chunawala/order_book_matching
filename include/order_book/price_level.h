@@ -30,8 +30,7 @@ class PriceLevel
     LevelType m_type;
     // Level price
     Price m_price;
-    // Number of orders at this price level
-    std::size_t m_count;
+
     // Total volume at this price
     std::size_t m_total_volume;
     /* std::deque is just a dynamic array of pointers to chunks
@@ -60,7 +59,6 @@ class PriceLevel
       , m_price{ price }
       , m_price_level_orders{ orders }
     {
-        m_count = m_price_level_orders.size();
         m_total_volume = std::accumulate(
           orders.begin(), orders.end(), 0, [](std::size_t accum, Order order) {
               accum += order.remaining_quantity;
@@ -71,15 +69,13 @@ class PriceLevel
     void swap(PriceLevel& other) noexcept
     {
         std::swap(m_type, other.m_type);
-        std::swap(m_count, other.m_count);
         std::swap(m_price, other.m_price);
         std::swap(m_total_volume, other.m_total_volume);
         std::swap(m_price_level_orders, other.m_price_level_orders);
     }
 
     PriceLevel(PriceLevel&& other) noexcept
-      : m_count{ std::exchange(other.m_count, 0) }
-      , m_type{ std::exchange(other.m_type, LevelType::BID) }
+      : m_type{ std::exchange(other.m_type, LevelType::BID) }
       , m_price{ std::exchange(other.m_price, 0) }
       , m_total_volume{ std::exchange(other.m_total_volume, 0) }
       , m_price_level_orders{ std::exchange(other.m_price_level_orders, {}) }
@@ -97,7 +93,7 @@ class PriceLevel
 
     Price get_price() const { return m_price; }
 
-    std::size_t get_count() const { return m_count; }
+    std::size_t get_count() const { return m_price_level_orders.size(); }
 
     std::size_t get_total_volume() const { return m_total_volume; }
 
@@ -119,7 +115,6 @@ class PriceLevel
     void add_order(Order order)
     {
         m_price_level_orders.push_back(order);
-        ++m_count;
         m_total_volume += order.initial_quantity;
     }
 
@@ -145,14 +140,12 @@ class PriceLevel
         Quantity cancel_quantity = it->remaining_quantity;
         m_price_level_orders.erase(it);
         m_total_volume -= cancel_quantity;
-        m_count -= 1;
     }
 
     void pop_front()
     {
         Order& order_at_front = m_price_level_orders.front();
         m_price_level_orders.pop_front();
-        --m_count;
         m_total_volume -= order_at_front.remaining_quantity;
     }
 
@@ -173,11 +166,12 @@ class PriceLevel
 
         if (executing_order.order_id == m_price_level_orders.front().order_id) {
             m_price_level_orders.pop_front();
-            m_count -= 1;
         }
     }
 
     Order& front() { return m_price_level_orders.front(); }
+
+    bool is_empty() { return m_price_level_orders.empty(); }
 };
 
 using PriceLevels = std::vector<PriceLevel>;
