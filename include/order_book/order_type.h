@@ -14,5 +14,5 @@ enum class OrderType
     FILL_OR_KILL,
     GOOD_FOR_DAY,
 };
-};
+}
 #endif

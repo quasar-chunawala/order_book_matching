@@ -15,6 +15,9 @@ set(INCLUDE_DIRECTORIES
 
 # Add source files
 set(SOURCE_FILES 
+    market_data_manager.cpp
+    order_book.cpp
+    price_levels.cpp
     order_book_tests.cpp
 )
 

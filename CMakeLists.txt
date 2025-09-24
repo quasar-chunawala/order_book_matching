@@ -19,5 +19,6 @@ include_directories(
     ${CMAKE_SOURCE_DIR}/include
 )
 
+add_subdirectory(src/order_book)
 add_subdirectory(test/memory_pool_tests)
 add_subdirectory(test/order_book_tests)
