@@ -51,7 +51,7 @@ void
 MarketDataManager::add_order(OrderType order_type,
                              UserId user_id,
                              Side side,
-                             SymbolName symbol_name,
+                             std::string_view symbol_name,
                              Price price,
                              Quantity quantity)
 {

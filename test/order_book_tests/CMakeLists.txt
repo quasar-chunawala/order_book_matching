@@ -10,14 +10,11 @@ set(CMAKE_CXX_STANDARD_REQUIRED 23)
 # set include directories
 set(INCLUDE_DIRECTORIES
     ${gtest_SOURCE_DIR}/include
-    ../../include/order_book/
+    ${CMAKE_SOURCE_DIR}/include/order_book
 )
 
 # Add source files
 set(SOURCE_FILES 
-    market_data_manager.cpp
-    order_book.cpp
-    price_levels.cpp
     order_book_tests.cpp
 )
 
@@ -30,7 +27,7 @@ set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}) # For static libraries
 add_executable(order_book_tests ${SOURCE_FILES})
 
 # Link Google Test libraries to the target
-target_link_libraries(order_book_tests gtest gtest_main)
+target_link_libraries(order_book_tests gtest gtest_main order_book)
 
 # Specify include directories for the target
 target_include_directories(order_book_tests PUBLIC ${INCLUDE_DIRECTORIES})

@@ -1,6 +1,9 @@
 #ifndef ORDER_BOOK_H
 #define ORDER_BOOK_H
 
+#include "order_node.h"
+#include "trade.h"
+#include "usings.h"
 #include <algorithm>
 #include <chrono>
 #include <deque>
@@ -19,9 +22,6 @@ namespace dev {
 class MarketDataManager; // forward declaration (avoid including manager header)
 class PriceLevel;        // forward declaration (we include its header below)
 
-#include "price_level.h" // include price_level (complete type) so PriceLevels is usable
-
-using OrderQueue = std::deque<Order>;
 using Trades = std::vector<Trade>;
 using PriceLevels = std::vector<PriceLevel>;
 

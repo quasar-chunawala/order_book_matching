@@ -1,6 +1,8 @@
 #ifndef MARKET_DATA_MANAGER_H
 #define MARKET_DATA_MANAGER_H
 
+#include "order_type.h"
+#include "usings.h"
 #include <cassert>
 #include <format>
 #include <memory>
@@ -12,6 +14,9 @@
 
 namespace dev {
 
+class OrderBook;
+struct Order;
+struct OrderId;
 /**
  * @brief The MarketDataManager is an orchestrator that manages symbols,
  * order books and orders.
@@ -35,7 +40,7 @@ class MarketDataManager
     void add_order(OrderType order_type,
                    UserId user_id,
                    Side side,
-                   SymbolName symbol_name,
+                   std::string_view symbol_name,
                    Price price,
                    Quantity quantity);
     void modify_order(OrderId order_id, Price new_price, Quantity new_quantity);
@@ -59,5 +64,4 @@ class MarketDataManager
 // Enqueue trades filled into -> MPMC Lock-free queue -> Publisher thread Market
 // dissemination
 }
-
 #endif
