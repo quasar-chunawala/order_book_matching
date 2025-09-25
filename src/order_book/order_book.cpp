@@ -1,4 +1,6 @@
 #include "order_book.h"
+#include "formatter.h"
+#include <cstring>
 
 namespace dev {
 OrderBook::OrderBook()
@@ -210,7 +212,7 @@ void
 OrderBook::add_order(OrderType order_type,
                      UserId user_id,
                      Side side,
-                     SymbolName symbol_name,
+                     std::string_view symbol_name,
                      Price price,
                      Quantity quantity)
 {
@@ -438,10 +440,10 @@ OrderBook::get_next_seq_num()
 }
 
 OrderId
-OrderBook::generate_order_id(SymbolName symbol_name)
+OrderBook::generate_order_id(std::string_view symbol_name)
 {
     OrderId order_id{ .symbol_name = "", .seq_num = get_next_seq_num() };
-    strcpy(order_id.symbol_name, symbol_name);
+    strcpy(order_id.symbol_name, std::string(symbol_name).c_str());
     return order_id;
 }
 
@@ -449,7 +451,7 @@ OrderBook::generate_order_id(SymbolName symbol_name)
  * @brief Helper function to find the location in vector<PriceLevel>
  * where the user-supplied @a price must be inserted.
  */
-auto
+PriceLevels::iterator
 OrderBook::find_insert_location(PriceLevels& price_levels,
                                 LevelType level_type,
                                 Price price)

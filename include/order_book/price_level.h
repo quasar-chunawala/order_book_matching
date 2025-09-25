@@ -1,6 +1,8 @@
 #ifndef PRICE_LEVEL_H
 #define PRICE_LEVEL_H
 
+#include "order.h"
+#include "usings.h"
 #include <algorithm>
 #include <cstdint>
 #include <deque>
@@ -13,6 +15,7 @@ namespace dev {
 
 using FreeList = std::deque<SeqNum>;
 class MarketDataManager;
+class OrderBook;
 
 enum class LevelType
 {
@@ -27,7 +30,15 @@ class PriceLevel
 {
   public:
     // Constructors
+    PriceLevel() = delete;
+    PriceLevel(const PriceLevel&) = delete;
+    PriceLevel& operator=(const PriceLevel&) = delete;
+
     explicit PriceLevel(LevelType type, Price price, OrderBook& order_book);
+    void swap(PriceLevel& other);
+    PriceLevel(PriceLevel&& other);
+
+    PriceLevel& operator=(PriceLevel&& other);
 
     // Getters
     LevelType get_level_type() const;

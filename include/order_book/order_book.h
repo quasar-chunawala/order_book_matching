@@ -2,7 +2,9 @@
 #define ORDER_BOOK_H
 
 #include "order_node.h"
+#include "price_level.h"
 #include "trade.h"
+#include "trade_info.h"
 #include "usings.h"
 #include <algorithm>
 #include <chrono>
@@ -20,7 +22,6 @@
 namespace dev {
 
 class MarketDataManager; // forward declaration (avoid including manager header)
-class PriceLevel;        // forward declaration (we include its header below)
 
 using Trades = std::vector<Trade>;
 using PriceLevels = std::vector<PriceLevel>;
@@ -65,7 +66,7 @@ class OrderBook
     void add_order(OrderType order_type,
                    UserId user_id,
                    Side side,
-                   SymbolName symbol_name,
+                   std::string_view symbol_name,
                    Price price,
                    Quantity quantity);
     void modify_order(OrderId order_id, Price new_price, Quantity new_quantity);
@@ -75,7 +76,7 @@ class OrderBook
     void delete_price_level(LevelType level_type, Price price);
 
     SeqNum get_next_seq_num();
-    OrderId generate_order_id(SymbolName symbol_name);
+    OrderId generate_order_id(std::string_view symbol_name);
 
   private:
     // All incoming orders are stored sequentially in an order_pool.
@@ -90,9 +91,9 @@ class OrderBook
     // Sell orders sorted by price (lowest first)
     std::vector<PriceLevel> m_asks;
 
-    auto find_insert_location(PriceLevels& price_levels,
-                              LevelType level_type,
-                              Price price);
+    PriceLevels::iterator find_insert_location(PriceLevels& price_levels,
+                                               LevelType level_type,
+                                               Price price);
 };
 
 using OrderBooks = std::unordered_map<size_t, OrderBook>;

@@ -1,6 +1,8 @@
 #ifndef FORMATTER_H
 #define FORMATTER_H
 
+#include "trade_info.h"
+#include "usings.h"
 #include <format>
 #include <string_view>
 

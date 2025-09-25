@@ -1,6 +1,7 @@
 #ifndef MARKET_DATA_MANAGER_H
 #define MARKET_DATA_MANAGER_H
 
+#include "order_book.h"
 #include "order_type.h"
 #include "usings.h"
 #include <cassert>
@@ -13,10 +14,6 @@
 #include <vector>
 
 namespace dev {
-
-class OrderBook;
-struct Order;
-struct OrderId;
 /**
  * @brief The MarketDataManager is an orchestrator that manages symbols,
  * order books and orders.

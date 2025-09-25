@@ -1,6 +1,9 @@
 #ifndef TRADEINFO_H
 #define TRADEINFO_H
 
+#include "order_id.h"
+#include "usings.h"
+
 enum class FillType
 {
     Partial,

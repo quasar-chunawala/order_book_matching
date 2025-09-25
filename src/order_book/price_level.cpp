@@ -1,4 +1,6 @@
 #include "price_level.h"
+#include "order_book.h"
+#include "order_node.h"
 
 namespace dev {
 using OrderPool = std::vector<OrderNode>;
@@ -11,6 +13,30 @@ PriceLevel::PriceLevel(LevelType type, Price price, OrderBook& order_book)
   , m_order_book{ order_book }
 {
 }
+void
+PriceLevel::swap(PriceLevel& other)
+{
+    std::swap(m_level_type, other.m_level_type);
+    std::swap(m_price, other.m_price);
+    std::swap(m_first_seq_num, other.m_first_seq_num);
+    std::swap(m_last_seq_num, other.m_last_seq_num);
+}
+PriceLevel::PriceLevel(PriceLevel&& other)
+  : m_level_type{ std::exchange(other.m_level_type, LevelType::BID) }
+  , m_price{ std::exchange(other.m_price, 0u) }
+  , m_first_seq_num{ std::exchange(other.m_first_seq_num, 0u) }
+  , m_last_seq_num{ std::exchange(other.m_last_seq_num, 0u) }
+  , m_order_book{ other.m_order_book }
+{
+}
+
+PriceLevel&
+PriceLevel::operator=(PriceLevel&& other)
+{
+    PriceLevel(std::move(other)).swap(*this);
+    return *this;
+}
+
 LevelType
 PriceLevel::get_level_type() const
 {
@@ -88,13 +114,19 @@ PriceLevel::pop_front()
     OrderPool& order_pool = m_order_book.m_order_pool;
     FreeList m_free_list = m_order_book.m_free_list;
     OrderNode& old_head = order_pool[m_first_seq_num];
-    OrderNode& new_head = order_pool[old_head.next];
-    m_free_list.push_back(m_first_seq_num);
-    m_first_seq_num = old_head.next;
+    if (old_head.next == 0) {
+        m_free_list.push_back(m_first_seq_num);
+        m_first_seq_num = 0;
+        m_last_seq_num = 0;
+    } else {
+        OrderNode& new_head = order_pool[old_head.next];
+        m_free_list.push_back(m_first_seq_num);
+        m_first_seq_num = old_head.next;
+    }
+
     old_head.order = std::nullopt;
     old_head.prev = 0;
     old_head.next = 0;
-    new_head.prev = 0;
 }
 
 void
@@ -128,15 +160,22 @@ PriceLevel::pop_back()
 {
     OrderPool& order_pool = m_order_book.m_order_pool;
     FreeList& free_list = m_order_book.m_free_list;
-    OrderNode& old_head = order_pool[m_first_seq_num];
-    OrderNode& new_head = order_pool[old_head.next];
-    free_list.push_back(m_first_seq_num);
-    m_first_seq_num = old_head.next;
-    old_head.order = std::nullopt;
-    old_head.prev = 0;
-    old_head.next = 0;
-    new_head.prev = 0;
+    OrderNode& old_tail = order_pool[m_last_seq_num];
+    free_list.push_back(m_last_seq_num);
+    if (old_tail.prev == 0) {
+        m_first_seq_num = 0;
+        m_last_seq_num = 0;
+    } else {
+        OrderNode& new_tail = order_pool[old_tail.prev];
+        m_last_seq_num = old_tail.prev;
+        new_tail.next = 0;
+    }
+
+    old_tail.order = std::nullopt;
+    old_tail.prev = 0;
+    old_tail.next = 0;
 }
+
 void
 PriceLevel::fill_order(Order order)
 {
@@ -155,6 +194,7 @@ PriceLevel::can_fill(Order order)
     bool is_price_cond_met =
       order.side == 'B' ? (m_level_type == LevelType::ASK && m_price <= order.price)
                         : (m_level_type == LevelType::BID && m_price >= order.price);
+    return is_price_cond_met;
 }
 bool
 PriceLevel::is_empty()
