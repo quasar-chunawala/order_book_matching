@@ -10,7 +10,7 @@ OrderBook::OrderBook()
   , m_free_list{}
 {
     m_order_pool.reserve(10000);
-    m_order_pool[0] = OrderNode{ .order = std::nullopt, .prev = 0u, .next = 0u };
+    m_order_pool.push_back(OrderNode{ .order = std::nullopt, .prev = 0u, .next = 0u });
 }
 
 // Getters
